@@ -1,6 +1,6 @@
 package ltcode.dp.medium.robTreeHouses337;
 
-import ltcode.ds.TreeNode;
+import ds.TreeNode;
 
 import java.util.HashMap;
 import java.util.Map;

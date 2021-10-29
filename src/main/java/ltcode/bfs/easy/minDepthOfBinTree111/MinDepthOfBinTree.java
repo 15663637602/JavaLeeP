@@ -1,6 +1,6 @@
 package ltcode.bfs.easy.minDepthOfBinTree111;
 
-import ltcode.ds.TreeNode;
+import ds.TreeNode;
 
 import java.util.LinkedList;
 import java.util.Queue;

@@ -1,6 +1,6 @@
 package ltcode.linkedLists.easy.mergeTwoLists21;
 
-import ltcode.ds.ListNode;
+import ds.ListNode;
 
 public class MergeTwoLists {
     public ListNode mergeTwoLists(ListNode l1, ListNode l2) {

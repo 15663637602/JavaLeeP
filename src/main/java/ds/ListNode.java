@@ -1,4 +1,4 @@
-package ltcode.ds;
+package ds;
 
 public class ListNode {
     public int val;
