@@ -74,6 +74,9 @@ public class TreeUtil {
         TreeNode hRLL = new TreeNode(17);
         hRL.left = hRLL;
 
+        TreeNode hRLR = new TreeNode(19);
+        hRL.right = hRLR;
+
         return head;
     }
 }
