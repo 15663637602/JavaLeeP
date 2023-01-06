@@ -30,3 +30,37 @@
     > 4. 如果内存中的数据还没有dump到磁盘，但是掉电了怎么办：**写内存之前先写到WAL**（类似于redo log）
  # LSM-Tree
 https://pic2.zhimg.com/80/v2-37576525d52091fd713bb13556c92861_720w.webp
+* 为什么要设计两个memtable？
+> 内存中的两个 memtable，一个是正常的接收写入请求的 memtable，一个是不可修改的immutable memtable
+> 为了防止 内存数据落盘时 导致的阻塞，首先将要落盘的数据在内存中复制一份到Active Memtable，然后将自己修改为只读的Immutable Memtable进行落盘，数据修改操作在Active Memtable中进行。
+* WAL log
+> 类似于redo log的作用
+* Level N分层
+> SStable （Sorted String Table），有序字符串表，这个有序的字符串就是数据的 key。SStable 一共有七层（L0 到 L6）。下一层的总大小限制是上一层的 10 倍
+> 首先，**level 0** 中 的任意一个 SSTable的内部，是没有重复数据的，因为它就是内存memtable就地写得来的(写的过程中自然会对 当前这次写 中重复的数据做处理)，但是不同的SSTable之间就是有重复数据了。
+其次，**level 1 ~ level N**，是由上一层的多个SSTable和本层SSTable的数据 取 **交集**之后，再压缩合并成一个SSTable的（逐层compact）。Level1-LevelN中，每一层是没有冗余数据的，但是层与层之间是有冗余数据的。
+
+### 写流程
+1. 将写入操作顺序写入WAL日志中，接下来把数据写到 memtable中（采用SkipList结构实现）
+2. MemTable达到一定大小后，将这个 memtable 切换为不可更改的 immutable memtable，并新开一个 memtable 接收新的写入请求
+3. 这个 immutable memtable进行持久化到磁盘，成为L0 层的 SSTable 文件
+4. 每一层的所有文件总大小是有限制的，每下一层大十倍。一旦某一层的总大小超过阈值了，就选择一个文件和下一层的文件合并。
+
+注意： 所有下一层被影响到的文件都会参与 Compaction。合并之后，保证 L1 到 L6 层的每一层的数据都是在 key 上全局有序的。而 L0 层是可以有重叠的
+
+### 写流程的约束
+- 日志文件用于崩溃恢复
+- 每个MemTable及SST文件中的Key都是有序的（字符顺序的升序）
+- 日志文件中的Key是无序的
+- **删除操作是标记删除，是插入操作的一种，真正的删除要在Compaction的时候实现**
+- 无更新实现，记录更新通过插入一条新记录实现
+
+### 读流程
+先查memtable，再查 immutable memtable，然后查 L0 层的所有文件，最后一层一层往下查。
+![6e0fed57b2020b90e95bf6516f979256.png](:/c50dc50aab1f4e05a75e3f9489a1de72)
+
+### SSM tree 总结
+	1. 按冷热数据进行分层
+	2. 在内存中就地写，在磁盘中追加写
+	3. 分治思想：Level0是有冗余文件的，level1-levelN，每一层内部是没有冗余数据的
+	4. 数据是有序的，level1 - leveln的SSTable文件间是有序的：key1~key10的数据放到第一个文件，key11~key30放到第二个文件，利用多路归并(由小的有序文件组合成一个大的有序文件)
