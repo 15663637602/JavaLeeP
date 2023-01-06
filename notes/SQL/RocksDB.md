@@ -57,7 +57,7 @@ https://pic2.zhimg.com/80/v2-37576525d52091fd713bb13556c92861_720w.webp
 
 ### 读流程
 先查memtable，再查 immutable memtable，然后查 L0 层的所有文件，最后一层一层往下查。
-![6e0fed57b2020b90e95bf6516f979256.png](:/c50dc50aab1f4e05a75e3f9489a1de72)
+https://img-blog.csdnimg.cn/20210602171338512.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3BlbnJpdmVy,size_16,color_FFFFFF,t_70
 
 ### SSM tree 总结
 	1. 按冷热数据进行分层
