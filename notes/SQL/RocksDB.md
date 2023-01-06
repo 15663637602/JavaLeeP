@@ -82,6 +82,8 @@ https://img-blog.csdnimg.cn/20210602171338512.png?x-oss-process=image/watermark,
 **所以跳表更适合多线程并发读写**
 
 实际代码中还用了很多办法，为了能够在多线程环境钟不出错的情况下，尽可能的提升效率
+可以看下inlineskiplist.h中对max_height_、next_的atomic定义
+max_height_.store用的memory_order_relaxed内存模型
 内存模型relaxed和release的区别 -->
 如果用release：那么不允许指令重排，那么上面的for循环代码会被优化到下面，那么插入17会导致17元素的位置会立即生成一个有高度的索引节点，那么可以提升查询效率
 如果用relaxed：for循环代码会被优化到下面去，导致不会立马多出一个索引节点，但是数据是正确的，并发能力得到了提升
