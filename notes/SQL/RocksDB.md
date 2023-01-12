@@ -8,6 +8,12 @@
  # RocksDB是怎么解决写多读少的问题的
  >LSM-Tree
  >LSM-Tree不是数据结构，是磁盘中组织数据的一种方式
+ # Rocksdb还可以改进的地方
+ > 读写放大严重；
+ > 应对突发流量的时候削峰能力不足；
+ > 压缩率有限；
+ > 索引效率较低；
+ > scan效率慢；
  
  ## 举个例子：
  * 通常我们的服务程序，在机器上面写日志为什么很快？--- **追加写**
@@ -91,7 +97,7 @@ max_height_.store用的memory_order_relaxed内存模型
 如果用release：那么不允许指令重排，那么上面的for循环代码会被优化到下面，那么插入17会导致17元素的位置会立即生成一个有高度的索引节点，那么可以提升查询效率
 如果用relaxed：for循环代码会被优化到下面去，导致不会立马多出一个索引节点，但是数据是正确的，并发能力得到了提升
 
-## 其他术语
+## 相关术语
 ### WAL（Write Ahead Log）
 顾名思义，就是在实际操作数据前先写日志，便于恢复。WAL在很多数据库中都存在。
 
@@ -141,7 +147,39 @@ https://user-images.githubusercontent.com/87458342/132666300-89414a96-987b-4d59-
 
 **Leveled： 不同 Level 里面的 SST 大小都是一致的，Level 1 里面的 SST 会跟 Level 2 一起进行 merge 操作，最终在 Level 2 形成一个有序的 SST，而各个 SST 不会重叠。**
 
+## RocksDB在磁盘中生成的文件
+### 生成的文件
+https://user-images.githubusercontent.com/87458342/132679048-d2495d9b-9e94-413f-9e78-107a3d79978a.png
+- xxx.log：wal日志文件
+- xxx.sst：数据文件
+- CURRENT：是一个特殊的文件，用于声明最新的manifest日志文件
+- IDENTITY：id
+- LOCK：无内容，open时创建，表示一个db在一个进程中只能被open一次，多线程共用此实例
+- LOG：统计日志
+- **MANIFEST**：指一个独立的日志文件，它包含RocksDB的状态快照/版本，**用于在重启的时候，恢复RocksDB到最后一个一致的一致性状态。**
+- OPTIONS：配置信息
+
+### MANIFEST
+Rocksdb对文件系统以及存储介质保持不可预知的态度。**文件系统操作不是原子的，并且在系统错误的时候容易出现不一致**。即使打开了日志系统，文件系统还是不能在一个不合法的重启中保持一致。POSIX文件系统不支持原子化的批量操作。因此，**无法依赖RocksDB的数据存储文件中的元数据文件来构建RocksDB重启前的最后的状态。**
+
+RocksDB有一个内建的机制来处理这些POSIX文件系统的限制，这个机制就是保存一个名为MANIFEST的RocksDB状态变化的事务日志文件。MANIFEST文件用于在重启的时候，恢复RocksDB到最后一个一致的一致性状态。
+
+MANIFEST 指通过一个事务日志，来追踪RocksDB状态迁移的系统
+Manifest日志 指一个独立的日志文件，它包含RocksDB的状态快照/版本
+CURRENT 指最后的Manifest日志
+RocksDB 称 Manifest 文件记录了 DB 状态变化的事务性日志，也就是说它记录了所有改变 DB 状态的操作。 RocksDB 的函数 VersionSet::LogAndApply 是对 Manifest 文件的更新操作，所以可以通过定位这个函数出现的位置来跟踪 Manifest 的记录内容。 Manifest 文件作为事务性日志文件，**只要数据库有变化，Manifest都会记录**。其内容 size 超过设定值后会被 VersionSet::WriteSnapShot 重写。 
+
+### RocksDB 进程 Crash 后 Reboot 的过程中，会首先读取 Manifest 文件在内存中重建 LSM 树，然后根据 WAL 日志文件恢复 memtable 内容。
+
 ------------
+RocksDB可以作为内嵌式数据库来使用，也可以作为自研数据库的底层存储引擎来使用，其数据结构是LSM tree，保证了读写效率。
+
+使用简单但调优困难，可以借鉴业界中一些开源产品对其使用时设置的参数，来参考调优。但切忌盲目“抄袭”参数，毕竟业务场景不同，对应的调优参数也是不同的。
+
+- 蚂蚁金服开源的SOFA-Jraft，采用RocksDB存储raft日志。
+- 百度开源图数据库HugeGraph，默认采用RocksDB作为存储引擎。
+- 国产开源分布式数据库TiDB，底层采用RocksDB作为存储引擎。
+
 RocksDB替换Redis：Pika
 解决重启加载数据慢的问题。redis是内存数据库，比如数据到50G以上，redis重启从磁盘加载数据到内存中就需要大量的时间。
 RocksDB替换innoDB：MyRocks
