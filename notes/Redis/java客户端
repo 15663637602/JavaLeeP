@@ -1,0 +1,156 @@
+1. Jedis  多线程下有安全问题，需要使用线程池
+2. lettuce 支持多线程 - springdata-redis默认使用
+3. redisson 将java的集合和api底层用redis实现并暴露接口，如map，set等
+
+# springdata-redis
+
+```
+<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-pool2</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>2.13.1</version>
+		</dependency>   
+```
+
+yml
+```
+spring:
+  redis:
+    host: 7.183.57.238
+    port: 6379
+    password: ca99920e-8ea7-11eb-8c95-0242ac11000a
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: 100ms
+```
+
+### RedisTemplate
+```
+@SpringBootTest
+class SpringbootDemoApplicationTests {
+
+	@Resource
+	private RedisTemplate redisTemplate;
+
+	@Test
+	void contextLoads() {
+		redisTemplate.opsForValue().set("name", "tq");
+		Object name = redisTemplate.opsForValue().get("name");
+		System.out.println("name = " + name);
+	}
+
+}
+```
+这里如果不初始化redis序列化方式的话，RedisTemplate会使用默认的jdkserialization，导致实际数据库中存的kv不是name和tq字符串
+而是：
+k: "\xac\xed\x00\x05t\x00\x04name"
+v: "\xac\xed\x00\x05t\x00\x02tq"
+
+#### 初始化序列化mode
+```
+@Configuration
+public class RedisConfig {
+
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+        GenericJackson2JsonRedisSerializer genericJackson2JsonRedisSerializer = new GenericJackson2JsonRedisSerializer();
+        template.setKeySerializer(RedisSerializer.string());
+        template.setHashKeySerializer(RedisSerializer.string());
+					 // value用json序列化mode
+        template.setValueSerializer(genericJackson2JsonRedisSerializer);
+        template.setValueSerializer(RedisSerializer.json());
+        return template;
+    }
+}
+
+```
+
+```
+@SpringBootTest
+class SpringbootDemoApplicationTests {
+
+	@Resource
+	private RedisTemplate<String, Object> redisTemplate;
+
+	@Test
+	void contextLoads() {
+		redisTemplate.opsForValue().set("name", "tq");
+		Object name = redisTemplate.opsForValue().get("name");
+		System.out.println("name = " + name);
+	}
+
+}
+```
+get name的结果会是(jsong格式):
+"\\"tq\\""
+
+
+#### 保存一个java对象
+```
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class User {
+    private String name;
+    private Integer age;
+}
+```
+
+```
+@Test
+	void testSaveUser() {
+		redisTemplate.opsForValue().set("user:100", new User("jojo", 32));
+		User user = (User) redisTemplate.opsForValue().get("user:100");
+		System.out.println(" user = " + user);
+	}
+```
+> output:  user = User(name=jojo, age=32)
+> redis-cli\> get user:100
+> "{\"@class\":\"com.yq.springbootdemo.redis.pojo.User\",\"name\":\"jojo\",\"age\":32}"
+
+
+### StringRedisTemplate
+可以看到上面的RedisTemplate在存储User对象的时候，额外存了一个@class属性（用于自动反序列化）会浪费额外的内存。
+为了**节省内存**，我们并**不会用JSON序列化器来处理value**，而是**统一使用string序列化器**，要求只能存储string类型的key和value，当需要存储java对象时，手动完成对象的序列化和反序列化。
+Spring默认提供了一个StringRedisTemplate类，它的k和v的序列化方式默认就是string方式，省去了我们手动定义
+```
+@SpringBootTest
+class RedisStringTests {
+
+	@Resource
+	private StringRedisTemplate redisTemplate;
+
+	private static final ObjectMapper mapper = new ObjectMapper();
+
+	@Test
+	void contextLoads() {
+		redisTemplate.opsForValue().set("name", "tq");
+		Object name = redisTemplate.opsForValue().get("name");
+		System.out.println("name = " + name);
+	}
+
+	@Test
+	void testSaveUser() throws JsonProcessingException {
+		String v = mapper.writeValueAsString(new User("jojo", 32));
+		redisTemplate.opsForValue().set("user:100", v);
+		String jsonV = redisTemplate.opsForValue().get("user:100");
+		User user = mapper.readValue(jsonV, User.class);
+		System.out.println(" user = " + user);
+	}
+}
+```
