@@ -40,6 +40,7 @@ string类型是redis最简单的存储类型，string类型的最大空间不能
 - INCRBYFLOAT：让一个浮点类型数字自增并指定步长
 - SETNX：添加一个kv，前提是这个key不存在，否则不执行
 - SETEX：添加一个kv，并指定有效期
+- 设置一个key(前提是不存在的key)，并且赋值为""，且设置过期时间为100s：  set test_nx_with_expire "" 100 NX
 
 
 层级存储，将key以：分割
