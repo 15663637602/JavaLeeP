@@ -6,6 +6,7 @@
  # RocksDB解决了什么问题
 >解决**写多读少**的问题，相对而言读的需求没那么旺盛，但是它读的性能也很好。
 >>有名的Mysql InnoDB B+树，主要是解决**读多写少**的问题
+>>Mysql存在空间放大的问题
  # RocksDB是怎么解决写多读少的问题的
  >LSM-Tree
  >LSM-Tree不是数据结构，是磁盘中组织数据的一种方式
@@ -22,6 +23,7 @@
     > Put(k1,v1)，Put(k2,v2)，Put(k1,v11)
  * 顺序写是很快了，但是查询就相对慢了，如何对查询做优化呢？
     > 可以将数据以**有序**数据块的方式存储，查找有序数组可以将复杂度 O(n) -> O(logN)
+    > 追加写 又是怎么做到以有序数据块的方式存储数据呢？ -- LSM树的SST结构
  * 冗余数据该如何处理呢？
     > 通过压缩合并的方式(compaction)，清除冗余数据。
     > 但是压缩合并操作会阻塞查询和插入操作，那么就需要将：
@@ -53,8 +55,9 @@
 > 在出现崩溃的时候，WAL日志可以用于完整的恢复memtable中的数据，以保证数据库能恢复到原来的状态。在默认配置的情况下，RocksDB通过在每次写操作后对WAL调用flush来保证一致性。
 * Level N分层
 > SStable （Sorted String Table），有序字符串表，这个有序的字符串就是数据的 key。SStable 一共有七层（L0 到 L6）。下一层的总大小限制是上一层的 10 倍
-> 首先，**level 0** 中 的任意一个 SSTable的内部，是没有重复数据的，因为它就是内存memtable就地写得来的(写的过程中自然会对 当前这次写 中重复的数据做处理)，但是不同的SSTable之间就是有重复数据了。
-其次，**level 1 ~ level N**，是由上一层的多个SSTable和本层SSTable的数据 取 **交集**之后，再压缩合并成一个SSTable的（逐层compact）。Level1-LevelN中，每一层是没有冗余数据的，但是层与层之间是有冗余数据的。
+> 首先，**level 0** 中 的任意一个 SSTable的内部，是没有重复数据的，但是不同的SSTable之间就是有重复数据了。因为它就是内存memtable就地写得来的(写的过程中自然会对 当前这次写 中重复的数据做处理)。因此查询时，在 0 层中要对所有 SST 文件逐个查找。
+其次，**level 1 ~ level N**，是由上一层的多个SSTable和本层SSTable的数据 取 **交集**之后，再压缩合并成一个SSTable的（逐层compact），挤出“水分”（重复的 key）然后分裂成多个 SST 文件。因此在 1 层之下，所有的 SST 文件键范围各不相交，且有序。这种组织方式，可以让我们在层内查找时，进行二分查找（O(log(N)) 复杂度），而非线性查找（O(N) 复杂度）。
+> Level1-LevelN中，每一层是没有冗余数据的，但是层与层之间是有冗余数据的。
 # RocksDB
 ![image.png](http://image.huawei.com/tiny-lts/v1/images/cdce2a7be3c0647168640a1a370aa1a7_773x369.png@900-0-90-f.png)
 ### rocksDB在磁盘中生成的文件
@@ -150,7 +153,7 @@ wal的写入是需要有序性的，但是memtable的写入是不需要有序性
 - - **从内存读**:MemTable->Immutable MemTable
 - - **从持久化设备读**:首先通过 table cache获取到文件的元数据如布隆过滤器以及数据块索引, 然后读取 block cache, block cache中缓存了SST的数据块,如果命中那就直接读取成功,否则便需要从SST中读取数据块并插入到block cache
 - RocksDB 帮我们处理了这其中所有肮脏的细节，而从使用者来看，一切都很简洁
-
+> 题外：[RocksDB读优化 - Indexing SST](https://zhuanlan.zhihu.com/p/556113577)
 ### 由Snapshot来提供一致性视图
 一个快照会捕获在创建的时间点的DB的一致性视图。快照在DB重启之后将消失。一个读取过程的iterator会对应一个snapshot
 ![image.png](http://image.huawei.com/tiny-lts/v1/images/ea28ce35034acb77b6bf0da816e978d1_655x325.png@900-0-90-f.png)
@@ -208,6 +211,7 @@ Tiered Compaction vs Leveled Compaction
 ![image.png](http://image.huawei.com/tiny-lts/v1/images/c6f8fa345af1b76a780917dc3f3d8afe_962x382.png@900-0-90-f.png)
 
 	假如要插入元素17，其实只需要对要插入的节点、和高度加锁。高度只影响读
+	插入时，先跳到对应的位置，先随机成熟，再建立节点之间的关系。图中随机了2层，那么先建立12、17、19的联系，再建立9、17、25的联系。
 	实际代码中还用了很多办法，为了能够在多线程环境钟不出错的情况下，尽可能的提升效率
 ![image.png](http://image.huawei.com/tiny-lts/v1/images/354f7733c44f5cc8eae010e6d943fa90_696x167.png@900-0-90-f.png)
 ![image.png](http://image.huawei.com/tiny-lts/v1/images/c793b217e5e32f719ef8d9c6e78c0a1f_651x122.png@900-0-90-f.png)
