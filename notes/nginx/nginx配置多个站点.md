@@ -1,6 +1,9 @@
 hosts文件中附加
-7.183.36.181 flt.yq.huawei.com
-7.183.36.181 antenna.yq.huawei.com
+
+7.183.36.181 flt.yq.l.com
+
+7.183.36.181 antenna.yq.l.com
+
 然后conf文件中增加一个server，name是antenna.yq.huawei.com
 ```
    server {
@@ -22,7 +25,7 @@ hosts文件中附加
 
     server {
       listen 80;
-      server_name antenna.yq.huawei.com;
+      server_name antenna.yq.l.com;
 
       location / {
          root /usr1/web/www;
