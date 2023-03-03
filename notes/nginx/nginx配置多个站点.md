@@ -38,3 +38,5 @@ hosts文件中附加
     }
 ```
 浏览器访问http://antenna.yq.l.com，就会转向 /usr1/web/www/index.html
+
+> server_name可以用正则匹配符，或者用空格隔开多个name
