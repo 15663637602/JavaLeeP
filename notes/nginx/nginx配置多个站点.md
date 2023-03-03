@@ -37,4 +37,4 @@ hosts文件中附加
       }
     }
 ```
-浏览器访问http://antenna.yq.huawei.com，就会转向 /usr1/web/www/index.html
+浏览器访问http://antenna.yq.l.com，就会转向 /usr1/web/www/index.html
