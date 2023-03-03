@@ -8,12 +8,11 @@ cd nginx-1.22.1/configure
 make
 make install
 vim /usr/lib/systemd/system/nginx.service
-
+```
 [Unit]
 Description=The nginx HTTP and reverse proxy server
 After=network.target remote-fs.target nss-lookup.target
 
->>>
 [Service]
 Type=forking
 PIDFile=/usr/local/nginx/logs/nginx.pid
@@ -32,12 +31,10 @@ PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
+```
+
 
 systemctl daemon-reload
 systemctl enable nginx.service
 systemctl start nginx.service
 systemctl status nginx.service
-
-
-
-
