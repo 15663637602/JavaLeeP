@@ -1,12 +1,14 @@
 apt install nginx
 ------
-
+```
 apt install openssl libssl-dev libpcre3 libpcre3-dev zlib1g-dev
 cd /usr1/installer/
 tar -zxvf nginx-1.22.1.tar.gz
 cd nginx-1.22.1/configure
 make
 make install
+```
+
 vim /usr/lib/systemd/system/nginx.service
 ```
 [Unit]
