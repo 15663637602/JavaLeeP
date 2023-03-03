@@ -37,6 +37,8 @@ WantedBy=multi-user.target
 
 
 systemctl daemon-reload
+```
 systemctl enable nginx.service
 systemctl start nginx.service
 systemctl status nginx.service
+```
