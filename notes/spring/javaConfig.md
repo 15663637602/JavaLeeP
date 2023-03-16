@@ -259,3 +259,15 @@ public class JavaConfig {
         System.out.println(bean);
     }
 ```
+### xml + SpringTest
+```
+// 在测试类的 @RunWith下
+// 添加注解
+@ContextConfiguration("classpath:applicationContext.xml")
+// 结合@Resource / @Autowire 去使用bean
+```
+### JavaConfig + SpringTest
+```
+// 在测试类上添加注解 指定@Configuration的配置类
+@ContextConfiguration(classes = JavaConfig.class)
+```
